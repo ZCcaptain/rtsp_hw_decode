@@ -4,7 +4,9 @@
  *  @date 2019.06.06 15:01:21
  *  @brief decode to jpeg 
  */
+
 #include "decode.h"
+#include "yuv2bgr.h"
 #include <cuda_runtime.h>
 #include <cuda_profiler_api.h>
 #include <curand.h>
@@ -22,7 +24,7 @@ static const AVIOInterruptCB int_cb = { decode_interrupt_cb, NULL };
 
 int ffmpeg_decode(AVFormatContext *ic, const int type, const int stream_id,
 		int (*cpu_cb)(const int type, cv::Mat&),
-		int (*gpu_cb)(const int flag, char *images, int size), bool use_hw_decode,
+		int (*gpu_cb)(const int flag, cv::cuda::GpuMat &image), bool use_hw_decode,
 		bool only_key_frame,
 		std::string gpu_id,
 		int quality,
@@ -40,7 +42,7 @@ int ffmpeg_global_init() {
 
 int ffmpeg_video_decode(const std::string &addr, const int type,
 		int (*cpu_cb)(const int type, cv::Mat&),
-		int (*gpu_cb)(const int flag, char *image, int size),std::string gpu_id,
+		int (*gpu_cb)(const int flag, cv::cuda::GpuMat &image),std::string gpu_id,
 		int quality,
 		int interval,
 		bool use_hw_decode,
@@ -63,6 +65,8 @@ int ffmpeg_video_decode(const std::string &addr, const int type,
 
 	//设置opts参数
 	AVDictionary *fmt_opts = NULL;
+	// av_dict_set(&fmt_opts, "stimeout", std::to_string( 2* 1000000).c_str(), 0); //设置链接超时时间（us）
+	// av_dict_set(&fmt_opts, "rtsp_transport",  "tcp", 0);
 	av_dict_set(&fmt_opts, "max_req_times", "2", 0);
 	av_dict_set(&fmt_opts, "buffer_size", "655360", 0);
 
@@ -126,7 +130,7 @@ int ffmpeg_video_decode(const std::string &addr, const int type,
 
 int ffmpeg_decode(AVFormatContext *ic, const int type, const int stream_id,
 		int (*cpu_cb)(const int type, cv::Mat&),
-		int (*gpu_cb)(const int flag, char *image, int size), bool use_hw_decode,
+		int (*gpu_cb)(const int flag, cv::cuda::GpuMat &image), bool use_hw_decode,
 		bool only_key_frame,
 		std::string  gpu_id,
 		int quality,
@@ -204,6 +208,8 @@ int ffmpeg_decode(AVFormatContext *ic, const int type, const int stream_id,
 	AVPixelFormat format = AV_PIX_FMT_BGR24;
 	int cv_format = CV_8UC3;
 	int align = 1;
+	int real_width = codec_ctx->width;
+	int real_height = codec_ctx->height;
 	av_log(NULL, AV_LOG_INFO, "width:%d,\nheight:%d,\n", codec_ctx->width,
 			codec_ctx->height);
 	int buffer_size = av_image_get_buffer_size(format, codec_ctx->width,
@@ -238,12 +244,12 @@ int ffmpeg_decode(AVFormatContext *ic, const int type, const int stream_id,
 	//开始解码
 	AVPacket pkt;
 	int count = 0;
-	int v = 1920*1080 + 1920*1080 / 2;
+	int v = real_height*real_width + real_height*real_width / 2;
 	uint8_t *image = new uint8_t[v];
-	char *image2 = new char[1920*1080];
+	char *image2 = new char[real_height*real_width];
 	RectSize *rs = new RectSize();
-	rs->height = 1080;
-	rs->width = 1920;
+	rs->height = real_height;
+	rs->width = real_width;
 	DataBuffer *db = new DataBuffer();
 	db->data = image;
 	db->capacity = v;
@@ -287,20 +293,38 @@ int ffmpeg_decode(AVFormatContext *ic, const int type, const int stream_id,
 				resMat.step = frame_bgr->linesize[0];
 				is_first_frame = true;
 			}
-			if(count % interval == 0){
-				int i;
-				for(i = 0 ; i < bufsize0 ; i++){
-					*(image + i) = frame->data[0][i];
-				}
-				for(int j = 0; i < bufsize0+ bufsize1; i++,j++){
-					*(image + i) = frame->data[1][j];
-				}
-				int size = jpeg_npp_mem(image2,quality,db,rs,3);
-				count=1;
-				gpu_cb(type, image2, size);
-			} else {
-				count++;
-			}
+			
+			cudaMemcpy(reqMat.data, frame->data[0], bufsize0,
+					cudaMemcpyHostToDevice);
+			cudaMemcpy(reqMat.data + bufsize0, frame->data[1], bufsize1,
+					cudaMemcpyHostToDevice);
+
+			cvtColor(reqMat.data, resMat.data, resolution, frame->height,
+					frame->width, frame->linesize[0]);
+			//回调
+
+			gpu_cb(type, resMat);
+
+
+
+
+
+
+
+
+			// int i;
+			// for(i = 0 ; i < bufsize0 ; i++){
+			// 	*(image + i) = frame->data[0][i];
+			// }
+			// for(int j = 0; i < bufsize0+ bufsize1; i++,j++){
+			// 	*(image + i) = frame->data[1][j];
+			// }
+			// int size = jpeg_npp_mem(image2,quality,db,rs,3);
+			// count=1;
+			// gpu_cb(type, image2, size);
+
+
+
 		} else { //软解码
 			memset(buffer, 0, buffer_size);
 			sws_scale(sws_ctx, frame->data, frame->linesize, 0, frame->height,

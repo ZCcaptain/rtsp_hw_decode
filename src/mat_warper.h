@@ -1,8 +1,8 @@
-/*
- * mat_warper.h
- *
- *  Created on: 2019年4月26日
- *      Author: sdkj
+/**  
+ *  Copyright (c) 2019 All Rights Reserved
+ *  @author Zhao Chao
+ *  @date 2019.06.06 15:01:21
+ *  @brief decode to jpeg 
  */
 
 #ifndef MAT_WARPER_H_

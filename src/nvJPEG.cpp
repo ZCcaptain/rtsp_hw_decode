@@ -1,38 +1,30 @@
-/* Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
- *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions
- * are met:
- *  * Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer.
- *  * Redistributions in binary form must reproduce the above copyright
- *    notice, this list of conditions and the following disclaimer in the
- *    documentation and/or other materials provided with the distribution.
- *  * Neither the name of NVIDIA CORPORATION nor the names of its
- *    contributors may be used to endorse or promote products derived
- *    from this software without specific prior written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ``AS IS'' AND ANY
- * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
- * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
- * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
- * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
- * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY
- * OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
- * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+/**  
+ *  Copyright (c) 2019 All Rights Reserved
+ *  @author Zhao Chao
+ *  @date 2019.06.06 15:01:21
+ *  @brief decode
  */
-
-// This sample needs at least CUDA 10.0. It demonstrates usages of the nvJPEG
-// library nvJPEG supports single and multiple image(batched) decode. Multiple
-// images can be decoded using the API for batch mode
 
 #include"nvJPEG.h"
 int dev_malloc(void **p, size_t s) { return (int)cudaMalloc(p, s); }
 
 int dev_free(void *p) { return (int)cudaFree(p); }
+inline cudaError_t CheckCUDA(cudaError_t status, const std::string func) {
+        if (status != cudaSuccess)
+                // ROS_ERROR("[CUDA ERROR][%s] %d", func.c_str(), status);
+                std::cout << "cuda" << std::endl;
+
+        return status;
+}
+
+
+inline nvjpegStatus_t ChecknvJPEG(nvjpegStatus_t status, const std::string func) {
+        if (status != NVJPEG_STATUS_SUCCESS)
+                // ROS_ERROR("[nvJPEG ERROR][%s] %d", func.c_str(), status);
+                std::cout << "NVJPEG"  << func.c_str()<< " "<<status<< std::endl;
+
+        return status;
+}
 
 typedef std::vector<std::string> FileNames;
 typedef std::vector<std::vector<char> > FileData;
@@ -167,7 +159,7 @@ int writeBMP(const char *filename, const unsigned char *d_chanR, int pitchR,
   return 0;
 }
 
-uchar *img = new uchar[1920*1080 * 3];
+uchar *img;
 cv::Mat writeMat(const unsigned char *d_chanR, int pitchR,
              const unsigned char *d_chanG, int pitchG,
              const unsigned char *d_chanB, int pitchB, int width, int height) {
@@ -175,7 +167,7 @@ cv::Mat writeMat(const unsigned char *d_chanR, int pitchR,
   int y;
   int n = 0;
   uchar red, green, blue;
-
+//  uchar img = uchar[width*height * 3];
   std::vector<unsigned char> vchanR(height * width);
   std::vector<unsigned char> vchanG(height * width);
   std::vector<unsigned char> vchanB(height * width);
@@ -371,7 +363,7 @@ cv::Mat  decode_jpeg(const unsigned char* image, int size){
 	writeBMP(filename, iout.channel[2], iout.pitch[2],
 	                     iout.channel[1], iout.pitch[1], iout.channel[0],
 	                     iout.pitch[0], widths[0], heights[0]);*/
-
+    img = new uchar[widths[0]*heights[0] * 3];
     cv::Mat mat = writeMat(iout.channel[2], iout.pitch[2],
     	                     iout.channel[1], iout.pitch[1], iout.channel[0],
     	                     iout.pitch[0], widths[0], heights[0]);
@@ -380,13 +372,118 @@ cv::Mat  decode_jpeg(const unsigned char* image, int size){
 
 	checkCudaErrors(nvjpegJpegStateDestroy(params.nvjpeg_state));
 	checkCudaErrors(nvjpegDestroy(params.nvjpeg_handle));
+	delete []img;
 	return mat;
 }
 
 
 
 
+py::bytes jpeg_encode(cv::Mat img, int height, int width){
 
+
+  nvjpegHandle_t nv_handle;
+  nvjpegEncoderState_t nv_enc_state;
+  nvjpegEncoderParams_t nv_enc_params;
+  cudaStream_t stream;
+  
+  std::cout << '1' << std::endl;
+  // initialize nvjpeg structures
+  if (CheckCUDA(
+            cudaStreamCreate(&stream),
+            "cudaStreamCreate") != 0)
+            std::cout << 'cudaStreamCreate' << std::endl;
+
+  if (ChecknvJPEG(
+      nvjpegCreateSimple(&nv_handle),
+      "nvjpegCreateSimple") != 0)
+      std::cout << 'nvjpegCreateSimple' << std::endl;
+
+  if (ChecknvJPEG(
+      nvjpegEncoderStateCreate(nv_handle, &nv_enc_state, stream),
+      "nvjpegEncoderStateCreate") != 0)
+      std::cout << 'nvjpegEncoderStateCreate' << std::endl;
+
+  if (ChecknvJPEG(
+      nvjpegEncoderParamsCreate(nv_handle, &nv_enc_params, stream),
+      "nvjpegEncoderParamsCreate") != 0)
+      std::cout << 'nvjpegEncoderParamsCreate' << std::endl;
+
+  // if (ChecknvJPEG(
+  //     nvjpegEncoderParamsSetQuality(encParams, quality, stream),
+  //     "nvjpegEncoderParamsSetQuality") != 0)
+  //     return false;
+
+  // if (ChecknvJPEG(
+  //     nvjpegEncoderParamsSetOptimizedHuffman(encParams, huffmanOptimized, stream),
+  //     "nvjpegEncoderParamsSetOptimizedHuffman") != 0)
+  //     return false;
+
+  // if (ChecknvJPEG(
+  //     nvjpegEncoderParamsSetSamplingFactors(encParams, NVJPEG_CSS_444, stream),
+  //     "nvjpegEncoderParamsSetSamplingFactors") != 0)
+  //     return false;
+
+std::cout << '2' << std::endl;
+
+  // std::cout<< "3" << std::endl;
+  nvjpegImage_t nv_image;
+  // nv_image.pitch[0] = width*3;
+
+  if (CheckCUDA(
+                cudaMalloc((void **)&(nv_image.channel[0]), 3 * width * height),
+                "cudaMalloc") != 0)
+                std::cout << 'cudaMalloc' << std::endl;
+
+            if (CheckCUDA(
+                cudaMemcpy(nv_image.channel[0], &img.data,
+                            3 * width * height, cudaMemcpyHostToDevice),
+                "cudaMemcpy") != 0)
+                std::cout << 'cudaMemcpy' << std::endl;
+  // Fill nv_image with image data, let’s say 640x480 image in RGB format
+  // std::cout<< "4" << std::endl;
+  // Compress image
+
+std::cout << '3' << std::endl;
+
+
+  if (ChecknvJPEG(
+            nvjpegEncodeImage(nv_handle, nv_enc_state, nv_enc_params,
+                                &nv_image, NVJPEG_INPUT_BGR,
+                                width, height, stream),
+            "nvjpegEncodeImage") != 0)
+            std::cout << 'nvjpegEncodeImage' << std::endl;
+  // get compressed stream size
+  size_t length;
+
+  if (ChecknvJPEG(
+            nvjpegEncodeRetrieveBitstream(nv_handle, nv_enc_state, NULL, &length, stream),
+            "nvjpegEncodeRetrieveBitstream") != 0)
+             std::cout << 'nvjpegEncodeRetrieveBitstream' << std::endl;
+  std::cout << '4' << std::endl;
+  // get stream itself
+if (CheckCUDA(
+            cudaStreamSynchronize(stream),
+            "cudaStreamSynchronize") != 0)
+            std::cout << 'cudaStreamSynchronize' << std::endl;
+  std::vector<unsigned char> jpeg(length);
+  std::cout << '5' << std::endl;
+   if (ChecknvJPEG(
+            nvjpegEncodeRetrieveBitstream(nv_handle, nv_enc_state, jpeg.data(), &length, 0),
+            "nvjpegEncodeRetrieveBitstream") != 0)
+            std::cout << 'nvjpegEncodeRetrieveBitstream2' << std::endl;
+  std::cout << '6' << std::endl;
+  // write stream to file
+if (CheckCUDA(
+            cudaStreamSynchronize(stream),
+            "cudaStreamSynchronize") != 0)
+            std::cout << 'cudaStreamSynchronize2' << std::endl;
+            std::cout << '7' << std::endl;
+  std::cout<< "length" << length << std::endl;
+  py::bytes jpg = py::bytes((char *)jpeg.data(), length);
+  return jpg;
+
+}
 
 
 

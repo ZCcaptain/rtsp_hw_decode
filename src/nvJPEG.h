@@ -1,8 +1,8 @@
-/*
- * nvJPEG.h
- *
- *  Created on: May 8, 2019
- *      Author: sdkj
+/**  
+ *  Copyright (c) 2019 All Rights Reserved
+ *  @author Zhao Chao
+ *  @date 2019.06.06 15:01:21
+ *  @brief decode
  */
 
 #ifndef NVJPEG_H_
@@ -13,14 +13,14 @@
 #include "nvjpeg.h"
 #include "helper_cuda.h"
 #include "helper_timer.h"
-
+#include <opencv2/opencv.hpp>
 #include <cstdlib>
 #include <fstream>
 #include <iostream>
 #include <sstream>
 #include <string>
 #include <vector>
-
+#include<pybind11/pybind11.h>
 #include <string.h>    // strcmpi
 #include <sys/time.h>  // timings
 
@@ -28,7 +28,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
-
+namespace py = pybind11;
 struct decode_params_t {
   std::string input_dir;
   int batch_size;
@@ -50,7 +50,7 @@ struct decode_params_t {
 
 
 int init_jpeg_decode();
-
+py::bytes jpeg_encode(cv::Mat img, int height, int width);
 void release_buffer(nvjpegImage_t &ibuf);
 cv::Mat decode_jpeg(const unsigned char* image, int size);
 

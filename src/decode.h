@@ -1,9 +1,9 @@
 /**  
- *  Copyright (c) 2017 LGPL, Inc. All Rights Reserved
- *  @author Chen Qian (chinahbcq@qq.com)
- *  @date 2017.04.18 11:32:44
- *  @brief 解码
- **/
+ *  Copyright (c) 2019 All Rights Reserved
+ *  @author Zhao Chao
+ *  @date 2019.06.06 15:01:21
+ *  @brief decode to jpeg 
+ */
 #include <string>
 #include<vector>
 #include<queue>
@@ -72,7 +72,7 @@ int ffmpeg_global_init();
 int ffmpeg_video_decode(const std::string &addr,
 		int flag,
 		int (*cpu_cb)(const int type, cv::Mat&),
-		int (*gpu_cb)(const int flag, char *image, int size),
+		int (*gpu_cb)(const int flag, cv::cuda::GpuMat &image),
 		std::string  gpu_id,
 		int quality,
 		int interval,

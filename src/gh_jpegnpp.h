@@ -1,8 +1,8 @@
 #ifndef __JPEG_NPP_H__
 #define __JPEG_NPP_H__
 
-#define IMAGE_MAX_WIDTH  1920
-#define IMAGE_MAX_HEIGHT 1080
+#define IMAGE_MAX_WIDTH  4096
+#define IMAGE_MAX_HEIGHT 4096
 
 //每个线程使用一个静态实例。
 #define USE_STATIC_INSTANCE	1

@@ -1,9 +1,10 @@
 /**  
- *  Copyright (c) 2017 LGPL, Inc. All Rights Reserved
- *  @author Chen Qian (chinahbcq@qq.com)
- *  @date 2017.04.18 11:33:21
- *  @brief 解码
+ *  Copyright (c) 2019 All Rights Reserved
+ *  @author Zhao Chao
+ *  @date 2019.06.06 15:01:21
+ *  @brief decode to jpeg 
  */
+
 #include "decode.h"
 #include <cuda_runtime.h>
 #include <cuda_profiler_api.h>
@@ -151,9 +152,11 @@ int ffmpeg_decode(AVFormatContext *ic, const int type, const int stream_id,
 //		codec = avcodec_find_decoder_by_name("hevc_cuvid");
 		if(codecpar->codec_id ==AV_CODEC_ID_HEVC )
 			codec = avcodec_find_decoder_by_name("hevc_cuvid");
-		else if(codecpar->codec_id ==AV_CODEC_ID_H264)  {
+		else if(codecpar->codec_id ==AV_CODEC_ID_H264)
 			codec = avcodec_find_decoder_by_name("h264_cuvid");
-		} else {
+		else if(codecpar->codec_id ==AV_CODEC_ID_MPEG4)
+ 			codec = avcodec_find_decoder_by_name("mpeg4_cuvid");
+		 else {
 			av_log(NULL,  AV_LOG_FATAL, "avcodec_find_decoder_by_name h264_cuvid failed\n");
 		}
 	} else {
@@ -162,7 +165,7 @@ int ffmpeg_decode(AVFormatContext *ic, const int type, const int stream_id,
 	}
 	if (NULL == codec) {
 		av_log(NULL, AV_LOG_FATAL,
-				"avcodec_find_decoder_by_name h264_cuvid failed\n");
+				"avcodec_find_decoder_by_name failed\n");
 		return -1;
 	}
 
@@ -202,6 +205,8 @@ int ffmpeg_decode(AVFormatContext *ic, const int type, const int stream_id,
 	AVPixelFormat format = AV_PIX_FMT_BGR24;
 	int cv_format = CV_8UC3;
 	int align = 1;
+	int real_width = codec_ctx->width;
+	int real_height = codec_ctx->height;
 	av_log(NULL, AV_LOG_INFO, "width:%d,\nheight:%d,\n", codec_ctx->width,
 			codec_ctx->height);
 	int buffer_size = av_image_get_buffer_size(format, codec_ctx->width,
@@ -236,12 +241,12 @@ int ffmpeg_decode(AVFormatContext *ic, const int type, const int stream_id,
 	//开始解码
 	AVPacket pkt;
 	int count = 0;
-	int v = 1920*1080 + 1920*1080 / 2;
+	int v = real_height*real_width + real_height*real_width / 2;
 	uint8_t *image = new uint8_t[v];
-	char *image2 = new char[1920*1080];
+	char *image2 = new char[real_height*real_width];
 	RectSize *rs = new RectSize();
-	rs->height = 1080;
-	rs->width = 1920;
+	rs->height = real_height;
+	rs->width = real_width;
 	DataBuffer *db = new DataBuffer();
 	db->data = image;
 	db->capacity = v;
